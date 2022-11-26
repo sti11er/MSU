@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+
 # 1. correct
 # 2. unrecognized command
 # 3. error, comment recording error
