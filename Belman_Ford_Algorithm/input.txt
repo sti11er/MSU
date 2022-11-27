@@ -1,0 +1,4 @@
+  "Moscov"      "Piter"    "plane"   60   7000  #comment sadfs
+"Piter" sd "Moscov" "plane" 60 7500
+
+  "lkjl"	"Piter"  "plane"  30  7000  #comment sadfs
