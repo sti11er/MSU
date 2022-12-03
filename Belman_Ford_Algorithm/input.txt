@@ -1,4 +1,12 @@
-  "Moscov"      "Piter"    "plane"   60   7000  #comment sadfs
-"Piter" sd "Moscov" "plane" 60 7500
+  "Москва"      "Санкт-Питербург"    "паровоз"   60   7000  #comment sadfs
+"Санкт-Питербург" "Москва" "паровоз" 60 7500
 
-  "lkjl"	"Piter"  "plane"  30  7000  #comment sadfs
+  "Москва"	"Тула"  "паровоз"  30  10000  #comment sadfs
+
+
+  "Москва"	"Крым"  "паровоз"  30  10000  #comment sadfs
+
+
+  "Москва"	"Тула"  "самолет"  30  10000  #comment sadfs
+
+  "Тула"	"Москва"  "самолет"  30  10000  #comment sadfs

@@ -29,9 +29,9 @@ type DynStrArray = array of string;
 type DynIntArray = array of integer;
 
 type routes = record
-	to_city: DynIntArray;
-	cruise_time: DynIntArray;
-	cruise_fare: DynIntArray;
+	to_cities: DynIntArray;
+	cruise_times: DynIntArray;
+	cruise_fares: DynIntArray;
 end;
 
 type Tgraph = array of array of routes;
@@ -40,10 +40,10 @@ type Arr = array [1..5] of string;
 
 var error_log: string; graph: Tgraph;
 	new_route: routes;
-	i, j: integer;
+	i, j, p: integer;
 	states: array[1..5] of string = ('from city','to city','transport type','cruise time','cruise fare');
 	transports, departure_cities, arrival_cities: DynStrArray;
-	number_of_possible_offers: array of integer;
+	number_of_possible_offers: DynIntArray;
 	flag_session, flag_parser: boolean;
 	input_file: text;
 	search_mode, transport_type: integer;
@@ -52,15 +52,15 @@ var error_log: string; graph: Tgraph;
 	dist: array of integer;
 
 
-procedure Belman_Ford_Algorithm(n: integer; src: integer, weight_type: integer);
-var i:integer;
-begin
-	SetLength(dist, n);
-	for i:=0 to n-1 do dist[i] := maxint;
+// procedure Belman_Ford_Algorithm(n: integer; src: integer, weight_type: integer);
+// var i:integer;
+// begin
+// 	SetLength(dist, n);
+// 	for i:=0 to n-1 do dist[i] := maxint;
 
-	dist[src] := 0;
+// 	dist[src] := 0;
 
-end;
+// end;
  
 
 
@@ -91,32 +91,6 @@ begin
 	char_in_string := res;
 end;
 
-procedure fill_in_graph(route_info: Arr);
-
-var transport_index: integer;
-	i, j, k: integer;
-begin
-	(* determine the index of the current vehicle *)
-	for k:=0 to length(transports)-1 do 
-	begin
-		if transports[k] = route_info[3] then
-			transport_index := k; 
-	end;
-
-	SetLength(number_of_possible_offers, length(transports));
-	i := transport_index;
-	j := number_of_possible_offers[transport_index];
-
-	(* expanding graph to length(transports) for rows and j+1 for columns *)
-	SetLength(graph, length(transports), j+1);
-
-	graph[i][j].to_city := route_info[2];
-	graph[i][j].cruise_time := StrToInt(route_info[4]);
-	graph[i][j].cruise_fare := StrToInt(route_info[5]);
-
-	number_of_possible_offers[transport_index] += 1;
-end;
-
 (* adding unique values to the array *)
 procedure uappend(val: string; var arr: DynStrArray);
 var l: integer;
@@ -130,6 +104,56 @@ begin
 	end;
 end;
 
+(* Finding an index element in a dynamic array *)
+function index(val: string; var arr: DynStrArray): integer;
+var i: integer;
+begin
+	index := -1;
+	i := 0;
+	
+
+	while (i < length(arr)) do
+	begin
+		if arr[i] = val then
+		begin
+			index := i;
+			break;
+		end;
+		i += 1;
+	end;
+end;
+
+procedure fill_in_graph(route_info: Arr);
+
+var transport_index: integer;
+	i, j, k: integer;
+	l : integer;
+begin
+
+ 	(* determine the index of the current vehicle *)
+	transport_index := index(route_info[3], transports);
+
+	SetLength(number_of_possible_offers, length(transports));
+	i := transport_index;
+	j := index(route_info[1], departure_cities);
+
+	(* expanding graph to length(transports) for rows and j+1 for columns *)
+	SetLength(graph, length(transports), j+1);
+
+	l := length(graph[i][j].to_cities);
+
+	writeln(i, j, route_info[1], route_info[2]);
+	SetLength(graph[i][j].to_cities, l+1);
+	graph[i][j].to_cities[l] := index(route_info[2], arrival_cities);
+
+	SetLength(graph[i][j].cruise_times, l+1);
+	graph[i][j].cruise_times[l] := StrToInt(route_info[4]);
+
+	SetLength(graph[i][j].cruise_fares, l+1);
+	graph[i][j].cruise_fares[l] := StrToInt(route_info[5]);
+
+	number_of_possible_offers[transport_index] += 1;
+end;
 
 (* function implements the processing of user file and create graph *)
 procedure parser();
@@ -203,7 +227,6 @@ begin
 			begin
 				if (r > 5) then
 				begin
-					writeln(el);
 					error_log := 'error, uncommented unnecessary information' + ' (' +IntToStr(line_number)+') line number';
 					flag_parser := false;
 					stop := false;
@@ -237,78 +260,87 @@ end;
 begin
 	error_log := '';
 	flag_session := true;
+	(* befault dimension graph *)
+	SetLength(graph, 1, 1);
 	parser();
 
 	if error_log = '' then
 	begin
 		for i:=0 to length(graph)-1 do 
-			for j:=0 to length(graph[i])-1 do 
-			begin
-				writeln(graph[i][j].from_city);
-				writeln(graph[i][j].to_city);
-				writeln(graph[i][j].cruise_time);
-				writeln(graph[i][j].cruise_fare);
-			end;
-		writeln('Привет');
-		while flag_session do 
 		begin
-			writeln('Выбери режим поиска:');
-			writeln('                               ');
-			writeln('1. Среди кратчайших по времени путей между двумя городами найти путь минимальной стоимости');
-			writeln('2. Среди путей между двумя городами найти путь минимальной стоимости');
-			writeln('3. Найти путь между 2-мя городами минимальный по числу посещенных городов');
-			writeln('4. Найти множество городов, достижимых из города отправления не более чем за limit_cost денег');
-			writeln('5. Найти множество городов, достижимых из города отправления не более чем за limit_time времени');
-			writeln('6. выйти');
-			writeln('                               ');
-
-			write('>: ');
-			readln(search_mode);
-			if search_mode = 6 then 
-				flag_session := false
-			else 
-			begin
-				if search_mode = 4 then
+			writeln(transports[i]);
+			for j:=0 to length(graph[i])-1 do 
+			begin 
+				if length(graph[i][j].to_cities) <> 0 then writeln(departure_cities[j]);
+				for p:=0 to length(graph[i][j].to_cities)-1 do
 				begin
-	 				writeln('Задайте limit_cost');
-	 				write('>: ');
-					readln(limit_cost);
+					writeln(arrival_cities[graph[i][j].to_cities[p]]);
+					writeln(graph[i][j].cruise_times[p]);
+					writeln(graph[i][j].cruise_fares[p]);
 				end;
-				if search_mode = 5 then
-				begin
-	 				writeln('Задайте limit_time');
-	 				write('>: ');
-					readln(limit_time);
-				end;
-				writeln('Каким типом транспорта ты хочешь воспользоваться:');
-				for i := 0 to length(transports)-1 do 
-				begin
-					writeln(IntToStr(i+1) + '. ' + transports[i])
-				end;
-				writeln('                               ');
-				write('>: ');
-				readln(transport_type);
-				writeln('Выбери город отправления:');
-				for i := 0 to length(departure_cities)-1 do 
-				begin
-					writeln(IntToStr(i+1) + '. ' + departure_cities[i])
-				end;
-				writeln('                               ');
-				write('>: ');
-				readln(from_city);
-				writeln('Выбери город прибытия:');
-				for i := 0 to length(arrival_cities)-1 do 
-				begin
-					writeln(IntToStr(i+1) + '. ' + arrival_cities[i])
-				end;
-				writeln('                               ');
-				write('>: ');
-				readln(to_city);
-				
-				
-				// Belman_Ford_Algorithm(length(graph), pos(from_city, graph));
 			end;
+			writeln('               ');
 		end;
-		writeln(error_log);
+		writeln('Привет');
+		// while flag_session do 
+		// begin
+		// 	writeln('Выбери режим поиска:');
+		// 	writeln('                               ');
+		// 	writeln('1. Среди кратчайших по времени путей между двумя городами найти путь минимальной стоимости');
+		// 	writeln('2. Среди путей между двумя городами найти путь минимальной стоимости');
+		// 	writeln('3. Найти путь между 2-мя городами минимальный по числу посещенных городов');
+		// 	writeln('4. Найти множество городов, достижимых из города отправления не более чем за limit_cost денег');
+		// 	writeln('5. Найти множество городов, достижимых из города отправления не более чем за limit_time времени');
+		// 	writeln('6. выйти');
+		// 	writeln('                               ');
+
+		// 	write('>: ');
+		// 	readln(search_mode);
+		// 	if search_mode = 6 then 
+		// 		flag_session := false
+		// 	else 
+		// 	begin
+		// 		if search_mode = 4 then
+		// 		begin
+	 // 				writeln('Задайте limit_cost');
+	 // 				write('>: ');
+		// 			readln(limit_cost);
+		// 		end;
+		// 		if search_mode = 5 then
+		// 		begin
+	 // 				writeln('Задайте limit_time');
+	 // 				write('>: ');
+		// 			readln(limit_time);
+		// 		end;
+		// 		writeln('Каким типом транспорта ты хочешь воспользоваться:');
+		// 		for i := 0 to length(transports)-1 do 
+		// 		begin
+		// 			writeln(IntToStr(i+1) + '. ' + transports[i])
+		// 		end;
+		// 		writeln('                               ');
+		// 		write('>: ');
+		// 		readln(transport_type);
+		// 		writeln('Выбери город отправления:');
+		// 		for i := 0 to length(departure_cities)-1 do 
+		// 		begin
+		// 			writeln(IntToStr(i+1) + '. ' + departure_cities[i])
+		// 		end;
+		// 		writeln('                               ');
+		// 		write('>: ');
+		// 		readln(from_city);
+		// 		writeln('Выбери город прибытия:');
+		// 		for i := 0 to length(arrival_cities)-1 do 
+		// 		begin
+		// 			writeln(IntToStr(i+1) + '. ' + arrival_cities[i])
+		// 		end;
+		// 		writeln('                               ');
+		// 		write('>: ');
+		// 		readln(to_city);
+				
+				
+		// 		// Belman_Ford_Algorithm(length(graph), pos(from_city, graph));
+		// 	end;
+		// end;
+		// writeln(error_log);
 	end;
 end.
