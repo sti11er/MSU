@@ -68,41 +68,32 @@ var error_log: string; graph: Tgraph;
 const Infinity = 1.0 / 0.0;
 
 
-// procedure Belman_Ford_Algorithm(src: string; weight_type: integer; var graph: transports); 
-
-// var i, len: integer;
-// 	dist: array of real;
-// 	curr_query, next_query: array of string;
-
-// begin
-// 	len := length(graph.from_cites) + length(graph.end_cites);
-// 	SetLength(dist, len);
-
-// 	SetLength(curr_query, len);
-// 	SetLength(next_query, len);
-
-// 	for i:=0 to len-1 do 
-// 	begin
-// 		if graph[i].name_from_city = src then
-// 		begin
-// 			dist[i] := 0.0;
-// 			next_query[0] := src;
-// 		end
-// 		else
-// 			dist[i] := Infinity;
-// 		writeln(dist[i]);
-// 	end;
-// end;
- 
-
 procedure delete(index: integer; var arr: arr_end_cites);
 var i: integer;
 begin
-	for i:=index to length(arr)-1 do
+	if length(arr) <= 1 then SetLength(arr, 0)
+	else 
 	begin
-		arr[i] := arr[i+1];
- 	end;
- 	SetLength(arr, length(arr)-1);
+		for i:=index to length(arr)-1 do
+		begin
+			arr[i] := arr[i+1];
+		end;
+		SetLength(arr, length(arr)-1);
+	end;
+end;
+
+procedure delete1(index: integer; var arr: DynIntArray);
+var i: integer;
+begin
+	if length(arr) <= 1 then SetLength(arr, 0)
+	else 
+	begin
+		for i:=index to length(arr)-1 do
+		begin
+			arr[i] := arr[i+1];
+		end;
+		SetLength(arr, length(arr)-1);
+	end;
 end;
 
 (* function that counts the number of identical elements *)
@@ -435,6 +426,103 @@ begin
 	close(input_file);
 end;
 
+procedure add_index_next_query(index: integer; var arr: DynIntArray);
+var i: integer;
+	flag: boolean;
+begin
+	flag := true;
+	for i:=0 to length(arr)-1 do
+		if index = arr[i] then
+		begin
+			flag := false;
+			break
+		end;
+
+	if flag then
+	begin
+		SetLength(arr, length(arr)+1);
+		arr[length(arr)-1] := index;
+	end;
+end;
+
+procedure Belman_Ford_Algorithm(src: string; weight_type: integer; var graph: transport); 
+
+var i, len, index_src, index_to_city: integer;
+	dist: array of real;
+	curr_query, next_query: DynIntArray;
+
+begin
+	index_src := find_index(src, graph.from_cites);
+	len := length(graph.from_cites) + length(graph.end_cites);
+	SetLength(dist, len);
+
+	SetLength(curr_query, len);
+	SetLength(next_query, len);
+
+	for i:=0 to len-1 do 
+	begin
+		dist[i] := Infinity;
+	end;
+
+	if index_src = -1 then
+	begin
+		writeln('finish node');
+		// for i:=0 to length(graph.end_cites)-1 do 
+		// begin
+		// 	if graph.end_cites[i].name_end_city = src then
+		// 	begin
+		// 		index_src := i;
+		// 		break
+		// 	end;
+		// end;
+		// dist[index_src+length(graph.from_cites)] := 0.0;
+	end
+	else
+	begin
+		dist[index_src] := 0.0;
+		SetLength(next_query, 1);
+		next_query[0] := index_src;
+
+		while length(next_query) > 0 do 
+		begin
+			curr_query := Copy(next_query);
+			SetLength(next_query, 0);
+
+			while length(curr_query) > 0 do
+			begin
+				for i:=0 to length(graph.to_cites[curr_query[0]])-1 do
+				begin
+					index_to_city := graph.to_cites[curr_query[0]][i].index_to_city;
+					// при weight_type = 1 делаем поиск по времени 
+					if weight_type = 1 then
+						if dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].time < dist[index_to_city] then
+						begin
+							dist[index_to_city] := dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].time;
+							if index_to_city < length(graph.from_cites) then 
+								add_index_next_query(index_to_city, next_query);
+						end
+					else 
+						if dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].cost < dist[index_to_city] then
+						begin
+							dist[index_to_city] := dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].cost;
+							if index_to_city < length(graph.from_cites) then 
+								add_index_next_query(index_to_city, next_query);
+						end; 
+				end;
+				delete1(0, curr_query);
+			end;
+		end;
+	end;
+	for i:=0 to length(dist)-1 do
+	begin
+		if i < length(graph.from_cites) then
+			writeln(dist[i]:2:2, ' ', graph.from_cites[i])
+		else 
+			writeln(dist[i]:2:2, ' ', graph.end_cites[i-length(graph.from_cites)].name_end_city);
+	end;
+end;
+
+
 begin
 	error_log := '';
 	flag_session := true;
@@ -444,7 +532,7 @@ begin
 	if error_log = '' then
 	begin
 		print_graph();
-		// Belman_Ford_Algorithm('Москва', 1, graph[0]);
+		Belman_Ford_Algorithm('Тула', 1, graph[0]);
 		// writeln('Привет');
 		// while flag_session do 
 		// begin
