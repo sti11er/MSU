@@ -28,8 +28,7 @@ type DynIntArray = array of integer;
  
 type to_city = record
 	index_to_city: integer;
-	cost: integer;
-	time: integer;
+	weight: array[1..2] of integer;
 	end;
 
 type arr_to_cites = array of to_city;
@@ -53,6 +52,10 @@ type transport = record
 type Tgraph = array of transport;
 type Arr = array [1..5] of string;
 
+type node_data = record
+	min_dist: real;
+	prev_node: integer;
+	end;
 
 var error_log: string; graph: Tgraph;
 	i, x, y: integer;
@@ -63,6 +66,7 @@ var error_log: string; graph: Tgraph;
 	search_mode, transport_type: integer;
 	curr_from_city, curr_to_city: string;
 	limit_cost, limit_time: integer;
+	index_trans: integer;
 
 
 const Infinity = 1.0 / 0.0;
@@ -160,8 +164,8 @@ begin
 	len := length(to_cites);
 	SetLength(to_cites, len+1);
 	to_cites[len].index_to_city := StrToInt(route_info[2]);
-	to_cites[len].time := StrToInt(route_info[4]);
-	to_cites[len].cost := StrToInt(route_info[5]);
+	to_cites[len].weight[1] := StrToInt(route_info[4]);
+	to_cites[len].weight[2] := StrToInt(route_info[5]);
 end;
 
 procedure add_to_city(route_info: Arr; var from_cites: DynStrArray; 
@@ -206,8 +210,8 @@ begin
 		end;
 	end;
 	to_cites[len_to_city].index_to_city := tmp1;
-	to_cites[len_to_city].time := StrToInt(route_info[4]);
-	to_cites[len_to_city].cost := StrToInt(route_info[5]);
+	to_cites[len_to_city].weight[1] := StrToInt(route_info[4]);
+	to_cites[len_to_city].weight[2] := StrToInt(route_info[5]);
 end;
 
 procedure add_from_city(route_info: Arr; var from_cites: DynStrArray; 
@@ -282,14 +286,15 @@ begin
 				if index < len then write('		',graph[i].from_cites[index],' ')
 				else write('		',graph[i].end_cites[index-len].name_end_city,' '); 
 
-				write(graph[i].to_cites[x][y].time,' ');
-				writeln(graph[i].to_cites[x][y].cost);
+				write(graph[i].to_cites[x][y].weight[1],' ');
+				writeln(graph[i].to_cites[x][y].weight[2]);
 			end;
 		end;
 		writeln('               ');
 	end;
 end;
 
+// заполнение индексов конечных вершин 
 procedure fill_in_graph(route_info: Arr);
 
 var index_trans, index_from_city, i: integer;
@@ -447,13 +452,15 @@ end;
 
 procedure Belman_Ford_Algorithm(src: string; weight_type: integer; var graph: transport); 
 
-var i, len, index_src, index_to_city: integer;
-	dist: array of real;
+var i, len, index_src, index_to_city, curr_weight: integer;
 	curr_query, next_query: DynIntArray;
+	curr_dist: real;
+	dist: array of node_data;
 
 begin
 	index_src := find_index(src, graph.from_cites);
 	len := length(graph.from_cites) + length(graph.end_cites);
+
 	SetLength(dist, len);
 
 	SetLength(curr_query, len);
@@ -461,25 +468,16 @@ begin
 
 	for i:=0 to len-1 do 
 	begin
-		dist[i] := Infinity;
+		dist[i].min_dist := Infinity;
 	end;
 
 	if index_src = -1 then
 	begin
-		writeln('finish node');
-		// for i:=0 to length(graph.end_cites)-1 do 
-		// begin
-		// 	if graph.end_cites[i].name_end_city = src then
-		// 	begin
-		// 		index_src := i;
-		// 		break
-		// 	end;
-		// end;
-		// dist[index_src+length(graph.from_cites)] := 0.0;
+		writeln('its finish node');
 	end
 	else
 	begin
-		dist[index_src] := 0.0;
+		dist[index_src].min_dist := 0.0;
 		SetLength(next_query, 1);
 		next_query[0] := index_src;
 
@@ -490,35 +488,34 @@ begin
 
 			while length(curr_query) > 0 do
 			begin
+				curr_dist := dist[curr_query[0]].min_dist;
 				for i:=0 to length(graph.to_cites[curr_query[0]])-1 do
 				begin
 					index_to_city := graph.to_cites[curr_query[0]][i].index_to_city;
+					curr_weight := graph.to_cites[curr_query[0]][i].weight[weight_type];
 					// при weight_type = 1 делаем поиск по времени 
-					if weight_type = 1 then
-						if dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].time < dist[index_to_city] then
-						begin
-							dist[index_to_city] := dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].time;
-							if index_to_city < length(graph.from_cites) then 
-								add_index_next_query(index_to_city, next_query);
-						end
-					else 
-						if dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].cost < dist[index_to_city] then
-						begin
-							dist[index_to_city] := dist[curr_query[0]] + graph.to_cites[curr_query[0]][i].cost;
-							if index_to_city < length(graph.from_cites) then 
-								add_index_next_query(index_to_city, next_query);
-						end; 
+					if curr_dist + curr_weight < dist[index_to_city].min_dist then
+					begin
+						dist[index_to_city].min_dist := curr_dist + curr_weight;
+						dist[index_to_city].prev_node := curr_query[0];
+
+						if index_to_city < length(graph.from_cites) then 
+							add_index_next_query(index_to_city, next_query);
+					end
 				end;
 				delete1(0, curr_query);
 			end;
 		end;
 	end;
+	
 	for i:=0 to length(dist)-1 do
 	begin
 		if i < length(graph.from_cites) then
-			writeln(dist[i]:2:2, ' ', graph.from_cites[i])
+			write(dist[i].min_dist:2:2, ' ', graph.from_cites[i], ' ')
 		else 
-			writeln(dist[i]:2:2, ' ', graph.end_cites[i-length(graph.from_cites)].name_end_city);
+			write(dist[i].min_dist:2:2, ' ', graph.end_cites[i-length(graph.from_cites)].name_end_city, ' ');
+
+		writeln(graph.from_cites[dist[i].prev_node], ' ');
 	end;
 end;
 
@@ -532,7 +529,7 @@ begin
 	if error_log = '' then
 	begin
 		print_graph();
-		Belman_Ford_Algorithm('Тула', 1, graph[0]);
+		Belman_Ford_Algorithm('Москва', 1, graph[0]);
 		// writeln('Привет');
 		// while flag_session do 
 		// begin
@@ -588,11 +585,10 @@ begin
 		// 		writeln('                               ');
 		// 		write('>: ');
 		// 		readln(curr_to_city);
-				
-				
-		// 		// Belman_Ford_Algorithm(length(graph), pos(curr_from_city, graph));
+
+		// 		Belman_Ford_Algorithm(curr_from_city, 1, graph[transport_type]);
 		// 	end;
 		// end;
-		// writeln(error_log);
+		writeln(error_log);
 	end;
 end.
