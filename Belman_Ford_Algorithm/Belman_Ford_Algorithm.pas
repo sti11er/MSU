@@ -25,6 +25,7 @@ const
 
 type DynStrArray = array of string;
 type DynIntArray = array of integer;
+type DynIntMatrix = array of DynIntArray;
  
 type to_city = record
 	index_to_city: integer;
@@ -54,19 +55,23 @@ type Arr = array [1..5] of string;
 
 type node_data = record
 	min_dist: real;
-	prev_node: integer;
+	prev_node: array of integer;
 	end;
 
+type arr_node_data = array of node_data;
+
 var error_log: string; graph: Tgraph;
-	i, x, y: integer;
+	i, x, y, j: integer;
 	states: array[1..5] of string = ('from city','to city','transport type','cruise time','cruise fare');
-	transports, departure_cities, arrival_cities: DynStrArray;
 	flag_session, flag_parser: boolean;
 	input_file: text;
 	search_mode, transport_type: integer;
-	curr_from_city, curr_to_city: string;
+	curr_from_city, curr_to_city: integer;
 	limit_cost, limit_time: integer;
-	index_trans: integer;
+	index_trans, index_to_city: integer;
+	dist: arr_node_data;
+	tmp: array of integer;
+	paths: DynIntMatrix;
 
 
 const Infinity = 1.0 / 0.0;
@@ -361,9 +366,6 @@ begin
 
 			if counter('', route_info) = 0 then 
 			begin
-				uappend(route_info[3], transports);
-				uappend(route_info[2], arrival_cities);
-				uappend(route_info[1], departure_cities);
 				fill_in_graph(route_info)
 			end
 			else if counter('', route_info) <> 5 then
@@ -450,12 +452,63 @@ begin
 	end;
 end;
 
-procedure Belman_Ford_Algorithm(src: string; weight_type: integer; var graph: transport); 
+function get_index_to_value(val: string; var graph: transport): integer;
+var index, i, len: integer;
+begin
+	index := -1;
+	len := length(graph.from_cites[i]) + length(graph.end_cites);
+	for i:=0 to len-1 do 
+	begin
+		if (graph.from_cites[i] = val) or (graph.end_cites[i-length(graph.from_cites)].name_end_city = val) then 
+		begin
+			index := i;
+			break
+		end;
+	end;
+	get_index_to_value := index;
+end;
 
-var i, len, index_src, index_to_city, curr_weight: integer;
+function get_value_to_index(index: integer; var graph: transport): string;
+var result: string;
+	len: integer;
+begin
+	len := length(graph.from_cites);
+	if index < len then result := graph.from_cites[index]
+	else result := graph.end_cites[index-length(graph.from_cites)].name_end_city;
+
+	get_value_to_index := result;
+end;
+
+
+procedure path_restoration(to_city: integer; end_city: integer; var dist: arr_node_data);
+var i, len: integer;
+begin	
+	SetLength(tmp, length(tmp)+1);
+	tmp[length(tmp)-1] := to_city;
+
+	if (to_city = end_city) then
+	begin
+		len := length(paths);
+		SetLength(paths, len+1);
+		paths[len] := tmp;
+	end
+	else
+	begin
+		for i:=0 to length(dist[to_city].prev_node)-1 do
+		begin
+			path_restoration(dist[to_city].prev_node[i], end_city, dist);
+		end;
+	end;
+	SetLength(tmp, length(tmp)-1);
+end;
+
+
+function Belman_Ford_Algorithm(src: string; weight_type: integer; var graph: transport): arr_node_data; 
+
+var i, k, len, index_src, index_to_city, curr_weight, len_prev_node: integer;
 	curr_query, next_query: DynIntArray;
 	curr_dist: real;
-	dist: array of node_data;
+	dist: arr_node_data;
 
 begin
 	index_src := find_index(src, graph.from_cites);
@@ -473,7 +526,7 @@ begin
 
 	if index_src = -1 then
 	begin
-		writeln('its finish node');
+		error_log := 'error, '+src+' finish node';
 	end
 	else
 	begin
@@ -494,31 +547,43 @@ begin
 					index_to_city := graph.to_cites[curr_query[0]][i].index_to_city;
 					curr_weight := graph.to_cites[curr_query[0]][i].weight[weight_type];
 					// при weight_type = 1 делаем поиск по времени 
-					if curr_dist + curr_weight < dist[index_to_city].min_dist then
+					if (curr_dist + curr_weight) < dist[index_to_city].min_dist then
 					begin
 						dist[index_to_city].min_dist := curr_dist + curr_weight;
-						dist[index_to_city].prev_node := curr_query[0];
+
+						SetLength(dist[index_to_city].prev_node, 1);
+						dist[index_to_city].prev_node[0] := curr_query[0];
 
 						if index_to_city < length(graph.from_cites) then 
 							add_index_next_query(index_to_city, next_query);
 					end
+					else if (curr_dist + curr_weight) = dist[index_to_city].min_dist then
+					begin
+						len_prev_node := length(dist[index_to_city].prev_node);
+						SetLength(dist[index_to_city].prev_node, len_prev_node+1);
+						dist[index_to_city].prev_node[len_prev_node] := curr_query[0];
+					end;
 				end;
 				delete1(0, curr_query);
 			end;
 		end;
 	end;
-	
+
 	for i:=0 to length(dist)-1 do
 	begin
 		if i < length(graph.from_cites) then
-			write(dist[i].min_dist:2:2, ' ', graph.from_cites[i], ' ')
+			writeln(dist[i].min_dist:2:2, ' ', graph.from_cites[i], ' ')
 		else 
-			write(dist[i].min_dist:2:2, ' ', graph.end_cites[i-length(graph.from_cites)].name_end_city, ' ');
+			writeln(dist[i].min_dist:2:2, ' ', graph.end_cites[i-length(graph.from_cites)].name_end_city, ' ');
 
-		writeln(graph.from_cites[dist[i].prev_node], ' ');
+		write('			');
+		for k:=0 to length(dist[i].prev_node)-1 do 
+			write(graph.from_cites[dist[i].prev_node[k]], ' ');
+		writeln();
 	end;
-end;
 
+	Belman_Ford_Algorithm := dist;
+end; 	
 
 begin
 	error_log := '';
@@ -529,65 +594,107 @@ begin
 	if error_log = '' then
 	begin
 		print_graph();
-		Belman_Ford_Algorithm('Москва', 1, graph[0]);
+		// 1.
+		dist := Belman_Ford_Algorithm('Москва', 1, graph[0]);
+		writeln('');
+		writeln('min time: ', dist[get_index_to_value('Тула', graph[0])].min_dist:2:2);
+		writeln();
+		writeln('possible routes:');
+		writeln('=================');
+
+		path_restoration(4, 0, dist);
+		for i:=0 to length(paths)-1 do
+		begin
+			for j:=length(paths[i])-1 downto 0 do
+			begin
+				write(get_value_to_index(paths[i][j], graph[0]), ' ');
+				if j <> 0 then write('=>');
+			end;
+			writeln();
+		end;
+
+
+		// 2.
+		// dist := Belman_Ford_Algorithm('Москва', 2, graph[0]);
+		// writeln('');
+		// writeln(dist[get_index_to_value('Тула', graph[0])].min_dist:2:2);
+		// path_restoration(get_index_to_value('Тула', graph[0]), get_index_to_value('Москва', graph[0]), dist, graph[0]);
+
+
+
 		// writeln('Привет');
 		// while flag_session do 
 		// begin
-		// 	writeln('Выбери режим поиска:');
-		// 	writeln('                               ');
-		// 	writeln('1. Среди кратчайших по времени путей между двумя городами найти путь минимальной стоимости');
-		// 	writeln('2. Среди путей между двумя городами найти путь минимальной стоимости');
-		// 	writeln('3. Найти путь между 2-мя городами минимальный по числу посещенных городов');
-		// 	writeln('4. Найти множество городов, достижимых из города отправления не более чем за limit_cost денег');
-		// 	writeln('5. Найти множество городов, достижимых из города отправления не более чем за limit_time времени');
-		// 	writeln('6. выйти');
-		// 	writeln('                               ');
+			// writeln('Выбери режим поиска:');
+			// writeln('                               ');
+			// writeln('1. Среди кратчайших по времени путей между двумя городами найти путь минимальной стоимости');
+			// writeln('2. Среди путей между двумя городами найти путь минимальной стоимости');
+			// writeln('3. Найти путь между 2-мя городами минимальный по числу посещенных городов');
+			// writeln('4. Найти множество городов, достижимых из города отправления не более чем за limit_cost денег');
+			// writeln('5. Найти множество городов, достижимых из города отправления не более чем за limit_time времени');
+			// writeln('6. выйти');
+			// writeln('                               ');
 
-		// 	write('>: ');
-		// 	readln(search_mode);
-		// 	if search_mode = 6 then 
-		// 		flag_session := false
-		// 	else 
-		// 	begin
-		// 		if search_mode = 4 then
-		// 		begin
-	 // 				writeln('Задайте limit_cost');
-	 // 				write('>: ');
-		// 			readln(limit_cost);
-		// 		end;
-		// 		if search_mode = 5 then
-		// 		begin
-	 // 				writeln('Задайте limit_time');
-	 // 				write('>: ');
-		// 			readln(limit_time);
-		// 		end;
-		// 		writeln('Каким типом транспорта ты хочешь воспользоваться:');
-		// 		for i := 0 to length(transports)-1 do 
-		// 		begin
-		// 			writeln(IntToStr(i+1) + '. ' + transports[i])
-		// 		end;
-		// 		writeln('                               ');
-		// 		write('>: ');
-		// 		readln(transport_type);
-		// 		writeln('Выбери город отправления:');
-		// 		for i := 0 to length(departure_cities)-1 do 
-		// 		begin
-		// 			writeln(IntToStr(i+1) + '. ' + departure_cities[i])
-		// 		end;
-		// 		writeln('                               ');
-		// 		write('>: ');
-		// 		readln(curr_from_city);
-		// 		writeln('Выбери город прибытия:');
-		// 		for i := 0 to length(arrival_cities)-1 do 
-		// 		begin
-		// 			writeln(IntToStr(i+1) + '. ' + arrival_cities[i])
-		// 		end;
-		// 		writeln('                               ');
-		// 		write('>: ');
-		// 		readln(curr_to_city);
+			// write('>: ');
+			// readln(search_mode);
+			// if search_mode = 6 then 
+			// 	flag_session := false
+			// else 
+			// begin
+				// if search_mode = 4 then
+				// begin
+	 		// 		writeln('Задайте limit_cost');
+	 		// 		write('>: ');
+				// 	readln(limit_cost);
+				// end;
+				// if search_mode = 5 then
+				// begin
+	 		// 		writeln('Задайте limit_time');
+	 		// 		write('>: ');
+				// 	readln(limit_time);
+				// end;
+				// writeln('Каким типом транспорта ты хочешь воспользоваться:');
+				// for i := 0 to length(graph)-1 do 
+				// begin
+				// 	writeln(IntToStr(i+1) + '. ' + graph[i].name_transport)
+				// end;
+				// writeln('                               ');
+				// write('>: ');
+				// readln(transport_type);
+				// writeln('Выбери город отправления:');
+				// for i := 0 to length(graph[transport_type-1].to_cites[number_from_city-1])-1 do 
+				// begin
+				// 	index_to_city := graph[transport_type-1].to_cites[number_from_city-1][i].index_to_city;
+				// 	if index_to_city < length(graph[transport_type-1].from_cites) then
+				// 		writeln('. '+graph[transport_type-1].from_cites[index_to_city])
+				// 	else 
+				// 		writeln('. '+graph[transport_type-1].end_cites[index_to_city-length(graph[transport_type-1].from_cites)].name_end_city)
+				// end;
+				// writeln('                               ');
+				// write('>: ');
+				// readln(curr_from_city);
 
-		// 		Belman_Ford_Algorithm(curr_from_city, 1, graph[transport_type]);
-		// 	end;
+				// writeln('Выбери город прибытия:');
+				// for i := 0 to length(graph[transport_type-1].to_cites[number_from_city-1])-1 do 
+				// begin
+				// 	index_to_city := graph[transport_type-1].to_cites[number_from_city-1][i].index_to_city;
+				// 	if index_to_city < length(graph[transport_type-1].from_cites) then
+				// 		writeln('. '+graph[transport_type-1].from_cites[index_to_city])
+				// 	else 
+				// 		writeln('. '+graph[transport_type-1].end_cites[index_to_city-length(graph[transport_type-1].from_cites)].name_end_city)
+				// end;
+				// writeln('                               ');
+				// write('>: ');
+				// readln(curr_to_city);
+
+				// if search_mode = 2 then
+				// begin
+				// 	dist := Belman_Ford_Algorithm(curr_from_city, 2, graph[transport_type]);
+				// 	path_restoration(curr_to_city, dist, graph[transport_type]);
+				// end;
+
+				// writeln(' ');
+			// end;
 		// end;
 		writeln(error_log);
 	end;
