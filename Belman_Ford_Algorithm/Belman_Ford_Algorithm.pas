@@ -29,7 +29,7 @@ type DynIntMatrix = array of DynIntArray;
  
 type to_city = record
 	index_to_city: integer;
-	weight: array[1..2] of integer;
+	weight: array[1..3] of integer;
 	end;
 
 type arr_to_cites = array of to_city;
@@ -171,6 +171,7 @@ begin
 	to_cites[len].index_to_city := StrToInt(route_info[2]);
 	to_cites[len].weight[1] := StrToInt(route_info[4]);
 	to_cites[len].weight[2] := StrToInt(route_info[5]);
+	to_cites[len].weight[3] := 1;
 end;
 
 procedure add_to_city(route_info: Arr; var from_cites: DynStrArray; 
@@ -217,6 +218,7 @@ begin
 	to_cites[len_to_city].index_to_city := tmp1;
 	to_cites[len_to_city].weight[1] := StrToInt(route_info[4]);
 	to_cites[len_to_city].weight[2] := StrToInt(route_info[5]);
+	to_cites[len_to_city].weight[3] := 1;
 end;
 
 procedure add_from_city(route_info: Arr; var from_cites: DynStrArray; 
@@ -292,7 +294,8 @@ begin
 				else write('		',graph[i].end_cites[index-len].name_end_city,' '); 
 
 				write(graph[i].to_cites[x][y].weight[1],' ');
-				writeln(graph[i].to_cites[x][y].weight[2]);
+				write(graph[i].to_cites[x][y].weight[2],' ');
+				writeln(graph[i].to_cites[x][y].weight[3]);
 			end;
 		end;
 		writeln('               ');
@@ -453,18 +456,30 @@ begin
 end;
 
 function get_index_to_value(val: string; var graph: transport): integer;
-var index, i, len: integer;
+var index, i, l1, l2: integer;
 begin
 	index := -1;
-	len := length(graph.from_cites[i]) + length(graph.end_cites);
-	for i:=0 to len-1 do 
+	l1 := length(graph.from_cites);
+	l2 := length(graph.end_cites);
+	for i:=0 to l1-1 do 
 	begin
-		if (graph.from_cites[i] = val) or (graph.end_cites[i-length(graph.from_cites)].name_end_city = val) then 
+		if (graph.from_cites[i] = val) then 
 		begin
 			index := i;
 			break
 		end;
 	end;
+
+	if index = -1 then
+		for i:=0 to l2-1 do
+		begin
+			if (graph.end_cites[i].name_end_city = val) then
+			begin
+				index := l1+i;
+				break
+			end;
+		end;
+
 	get_index_to_value := index;
 end;
 
@@ -585,6 +600,103 @@ begin
 	Belman_Ford_Algorithm := dist;
 end; 	
 
+procedure path_min_time_and_cost(from_city:string; to_city:string; var dist: arr_node_data; var graph: transport);
+var min_cost, cost, i, j, index_min_cost: integer;
+	index_from_city, index_to_city: integer;
+begin
+	writeln();
+	index_to_city := get_index_to_value(to_city,graph);
+	index_from_city := get_index_to_value(from_city,graph);
+
+	min_cost := 10000000;
+	writeln('');
+	writeln('min time: ', dist[get_index_to_value('Тула', graph)].min_dist:2:2);
+
+	path_restoration(index_to_city, index_from_city, dist);
+	for i:=0 to length(paths)-1 do
+	begin
+		cost := 0;
+		for j:=length(paths[i])-1 downto 0 do
+		begin
+			if j <> length(paths[i])-1 then 
+				cost += graph.to_cites[index_from_city][paths[i][j]].weight[2];
+		end;
+		if cost < min_cost then
+		begin 
+			min_cost := cost;
+			index_min_cost := i;
+		end;
+	end;
+
+	writeln('path min time and min cost:');
+	writeln('=================');
+	write('	');
+	for j:=length(paths[index_min_cost])-1 downto 0 do
+	begin
+		write(get_value_to_index(paths[index_min_cost][j], graph));
+		if j <> 0 then write('=>');
+	end;
+	writeln();
+end;
+
+procedure path_min_cost(from_city:string; to_city:string; var dist: arr_node_data; var graph: transport);
+var i, j, index_min_cost: integer;
+	index_from_city, index_to_city: integer;
+begin
+	writeln('');
+	index_to_city := get_index_to_value(to_city,graph);
+	index_from_city := get_index_to_value(from_city,graph);
+
+	writeln('');
+	writeln('min cost: ', dist[get_index_to_value('Тула', graph)].min_dist:2:2);
+	writeln('possible route:');
+	writeln('=================');
+
+	path_restoration(index_to_city, index_from_city, dist);
+	for i:=0 to length(paths)-1 do
+	begin
+		write('	');
+		for j:=length(paths[i])-1 downto 0 do
+		begin
+			write(get_value_to_index(paths[i][j], graph));
+			if j <> 0 then write('=>');
+		end;
+		writeln();
+	end;
+	writeln();
+end;
+
+procedure path_min_length(from_city:string; to_city:string; var dist: arr_node_data; var graph: transport);
+var i, j, index_min_length, min_length: integer;
+	index_from_city, index_to_city: integer;
+begin
+	index_to_city := get_index_to_value(to_city,graph);
+	index_from_city := get_index_to_value(from_city,graph);
+
+	min_length := 1000000;
+
+	writeln('');
+	writeln('possible route:');
+	writeln('=================');
+
+	path_restoration(index_to_city, index_from_city, dist);
+
+	for i:=0 to length(paths)-1 do
+	begin
+		if length(paths[i]) < min_length then
+			min_length := length(paths[i]);
+
+		index_min_length := i;
+	end;
+
+	for i:=length(paths[index_min_length])-1 downto 0 do
+	begin
+		write(get_value_to_index(paths[index_min_length][i], graph));
+		if i <> 0 then write('=>');
+	end;
+	writeln();
+end;
+
 begin
 	error_log := '';
 	flag_session := true;
@@ -594,32 +706,20 @@ begin
 	if error_log = '' then
 	begin
 		print_graph();
-		// 1.
-		dist := Belman_Ford_Algorithm('Москва', 1, graph[0]);
-		writeln('');
-		writeln('min time: ', dist[get_index_to_value('Тула', graph[0])].min_dist:2:2);
-		writeln();
-		writeln('possible routes:');
-		writeln('=================');
+		// // 1.
+		// dist := Belman_Ford_Algorithm('Москва', 1, graph[0]);
+		// path_min_time_and_cost('Москва','Тула',dist, graph[0]);
 
-		path_restoration(4, 0, dist);
-		for i:=0 to length(paths)-1 do
-		begin
-			for j:=length(paths[i])-1 downto 0 do
-			begin
-				write(get_value_to_index(paths[i][j], graph[0]), ' ');
-				if j <> 0 then write('=>');
-			end;
-			writeln();
-		end;
-
-
-		// 2.
+		// // 2.
 		// dist := Belman_Ford_Algorithm('Москва', 2, graph[0]);
-		// writeln('');
-		// writeln(dist[get_index_to_value('Тула', graph[0])].min_dist:2:2);
-		// path_restoration(get_index_to_value('Тула', graph[0]), get_index_to_value('Москва', graph[0]), dist, graph[0]);
+		// path_min_cost('Москва','Тула',dist, graph[0]);
 
+		// 3.
+		// dist := Belman_Ford_Algorithm('Москва', 3, graph[0]);
+		// path_min_length('Москва', 'Курск', dist, graph[0]);
+
+		// 4 
+		
 
 
 		// writeln('Привет');
