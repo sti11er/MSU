@@ -1,0 +1,30 @@
+тесты:
+
+1. стандартный пример
+ablkjlfkdjgdlbd-:fin:-abcdeFVadhppphdaVFedcba -:fin:-
+
+"""
+ablkjlfkdjgdlb#"""
+
+"""
+*********************** -:fin:-"""
+
+2. тест на экранирование
+
+\\\\text abc \\\\\-:fin:- \\\\\\-:fin:-
+\\\3F -:fin:-
+
+"""
+\\text abc##############"""
+
+"""
+\? """
+
+3. текст на пустой текст
+
+-:fin:-abf -:fin:- 
+
+error
+
+
+
